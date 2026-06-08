@@ -1,42 +1,63 @@
 package wfe
 
 type Workflow struct {
-	actions []Action
+	actions   []Action
+	startNode *Node
+	endNode   *Node
 }
 
 func New() *Workflow {
-	return &Workflow{actions: make([]Action, 0)}
+	return &Workflow{
+		startNode: nil,
+		endNode:   nil,
+	}
 }
 
 func (wf *Workflow) Insert(action Action) *Workflow {
-	wf.actions = append(wf.actions, action)
+	node := &Node{action: action, next: nil}
+
+	if wf.startNode == nil {
+		wf.startNode = node
+		wf.endNode = node
+		return wf
+	}
+
+	wf.endNode.next = node
+	wf.endNode = node
 	return wf
 }
 
 func (wf *Workflow) Execute(input any) (any, error) {
 	data := input
-	for _, action := range wf.actions {
-		output, err := action.RunAction(data)
+	node := wf.startNode
+	for node != nil {
+		output, err := node.action.RunAction(data)
 		if err != nil {
 			return output, err
 		}
 		data = output
+		node = node.next
 	}
 	return data, nil
 }
 
+type Node struct {
+	action Action
+	next   *Node
+}
+
 type Action interface {
-	RunAction(inputs any) (any, error)
+	RunAction(input any) (any, error)
 }
 
 type RunnableAction struct {
-	fn func(inputs any) (any, error)
+	fn func(input any) (any, error)
 }
 
-func NewRunnableAction(fn func(inputs any) (any, error)) *RunnableAction {
+func NewRunnableAction(fn func(input any) (any, error)) *RunnableAction {
 	return &RunnableAction{fn: fn}
 }
 
-func (action *RunnableAction) RunAction(inputs any) (any, error) {
-	return action.fn(inputs)
+func (action *RunnableAction) RunAction(input any) (any, error) {
+	return action.fn(input)
 }
